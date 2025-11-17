@@ -4,16 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Générateur d'Analyse Philosophique</title>
-    <!-- Chargement de Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Simplification de l'importation de la police pour éviter les problèmes de chargement */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
         
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f7f9fb;
-            /* Assurance que le contenu n'est pas masqué */
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -23,9 +20,8 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
         }
         .analysis-section {
-            border-left: 4px solid #3b82f6; /* Blue border for analysis */
+            border-left: 4px solid #3b82f6;
         }
-        /* Custom scrollbar for better aesthetics */
         .results-container::-webkit-scrollbar {
             width: 8px;
         }
@@ -39,10 +35,13 @@
 
     <!-- En-tête -->
     <header class="w-full max-w-4xl text-center mb-8">
-        <h1 class="text-4xl font-extrabold text-gray-800 mb-2 text-center">
-            📚 ANALYSE PHILOSOPHIQUE 📚
+        <h1 class="text-4xl font-extrabold text-gray-800 mb-2 flex items-center justify-center space-x-3">
+            <img src="https://placehold.co/50x50/374151/ffffff?text=🤔" alt="Statue de Penseur" class="h-12 w-12 rounded-lg object-cover">
+            <span>📚 ANALYSE PHILOSOPHIQUE 📚</span>
+            <img src="https://placehold.co/50x50/374151/ffffff?text=🤔" alt="Statue de Penseur" class="h-12 w-12 rounded-lg object-cover">
         </h1>
         <p class="text-lg text-gray-600">Explorez un sujet à travers les grandes pensées philosophiques et sociologiques.</p>
+        <div id="backend-status" class="mt-3 text-sm"></div>
     </header>
 
     <!-- Conteneur Principal -->
@@ -82,7 +81,7 @@
 
     </main>
 
-    <!-- Modal pour les messages (à la place de alert()) -->
+    <!-- Modal pour les messages -->
     <div id="modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center p-4 z-50">
         <div class="bg-white rounded-lg p-6 w-full max-w-sm card">
             <h3 class="text-xl font-bold mb-4 text-gray-800" id="modal-title"></h3>
@@ -91,50 +90,12 @@
         </div>
     </div>
 
-    <!-- Scripts Firebase et Logique d'Application -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <!-- Script JavaScript -->
+    <script>
+        // Configuration - URL du backend (à modifier selon votre environnement)
+        const BACKEND_URL = 'https://analyseur-philo-backend.onrender.com';
 
-        // Global variables for Firebase context (MANDATORY)
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // --- Firebase Initialization (MANDATORY for context) ---
-        let auth;
-        if (Object.keys(firebaseConfig).length > 0) {
-            try {
-                const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                setLogLevel('debug');
-
-                if (initialAuthToken) {
-                    signInWithCustomToken(auth, initialAuthToken)
-                        .then(() => console.log("Firebase signed in with custom token."))
-                        .catch(error => {
-                            console.error("Firebase Custom Token Sign-in Failed:", error);
-                            // Fallback to anonymous sign-in if custom token fails
-                            signInAnonymously(auth).then(() => console.log("Signed in anonymously (fallback)."));
-                        });
-                } else {
-                    signInAnonymously(auth)
-                        .then(() => console.log("Firebase signed in anonymously."))
-                        .catch(error => console.error("Firebase Anonymous Sign-in Failed:", error));
-                }
-            } catch (e) {
-                console.error("Firebase Initialization Failed:", e);
-            }
-        }
-        // -----------------------------------------------------------
-
-        // --- Gemini API Configuration ---
-        // CLÉ INTÉGRÉE : La clé est maintenant codée en dur pour résoudre l'erreur 401.
-        const API_KEY = "AIzaSyDB3Lnc8BbVlJoWJc4FQt1qoZTZzHkhrOY"; 
-        const MODEL = 'gemini-2.5-flash-preview-09-2025';
-        
-        // --- DOM Elements ---
+        // DOM Elements
         const subjectInput = document.getElementById('subject-input');
         const analyzeButton = document.getElementById('analyze-button');
         const loadingSpinner = document.getElementById('loading-spinner');
@@ -142,10 +103,34 @@
         const analysisResults = document.getElementById('analysis-results');
         const analyzedSubject = document.getElementById('analyzed-subject');
         const errorMessage = document.getElementById('error-message');
+        const backendStatus = document.getElementById('backend-status');
 
-        // --- Utility Functions ---
+        // Vérifier l'état du backend au chargement
+        async function checkBackendHealth() {
+            try {
+                const response = await fetch(`${BACKEND_URL}/health`);
+                if (response.ok) {
+                    backendStatus.innerHTML = '<span class="text-green-600">✅ Backend connecté</span>';
+                } else {
+                    throw new Error('Backend non disponible');
+                }
+            } catch (error) {
+                backendStatus.innerHTML = '<span class="text-red-600">❌ Backend déconnecté - Veuillez démarrer le serveur</span>';
+                analyzeButton.disabled = true;
+            }
+        }
 
-        /** Shows a custom modal instead of the banned alert() */
+        // Vérifier au chargement de la page
+        checkBackendHealth();
+
+        /** Afficher/Masquer le spinner de chargement */
+        function setLoading(isLoading) {
+            analyzeButton.disabled = isLoading;
+            loadingSpinner.classList.toggle('hidden', !isLoading);
+            errorMessage.classList.add('hidden');
+        }
+
+        /** Afficher une modal personnalisée */
         function showModal(title, body) {
             document.getElementById('modal-title').textContent = title;
             document.getElementById('modal-body').textContent = body;
@@ -153,39 +138,27 @@
             document.getElementById('modal').classList.add('flex');
         }
 
-        /** Handles UI state during loading */
-        function setLoading(isLoading) {
-            analyzeButton.disabled = isLoading;
-            loadingSpinner.classList.toggle('hidden', !isLoading);
-            // Use double quotes for the string to correctly handle the apostrophe 'l'
-            analyzeButton.querySelector('span').textContent = isLoading ? 'Analyse en cours...' : "Lancer l'Analyse"; 
-            errorMessage.classList.add('hidden');
-        }
+        /** Rendre les résultats de l'analyse dans le DOM */
+        function renderAnalysis(analysisData) {
+            analysisResults.innerHTML = '';
 
-        /** Renders the results from the structured JSON output */
-        function renderAnalysis(analysisArray) {
-            analysisResults.innerHTML = ''; // Clear previous results
-
-            analysisArray.forEach(item => {
+            analysisData.forEach((item, index) => {
                 const section = document.createElement('div');
-                section.className = 'analysis-section p-4 md:p-6 bg-blue-50/50 rounded-xl';
+                section.className = 'analysis-section bg-blue-50 p-5 rounded-lg';
                 section.innerHTML = `
-                    <h3 class="text-xl md:text-2xl font-bold text-gray-800 mb-3">${item.thinker}</h3>
-
-                    <div class="mb-4">
-                        <p class="font-semibold text-blue-600 mb-1 flex items-center">
-                            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.24A1.999 1.999 0 0013.882 3H8.118a1.999 1.999 0 00-1.737.98L4.3 6.98A1.999 1.999 0 003 9v7a2 2 0 002 2h4.5M21 17l-5.618-5.618m5.618 5.618L17.882 20h2.118a2 2 0 002-2v-7a2 2 0 00-1.708-1.93L19 10"></path></svg>
-                            Approche Générale (Thèmes Vastes)
-                        </p>
-                        <p class="text-gray-700 leading-relaxed">${item.generalApproach}</p>
-                    </div>
-
-                    <div>
-                        <p class="font-semibold text-blue-600 mb-1 flex items-center">
-                            <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                            Analyse Spécifique (Application au Sujet)
-                        </p>
-                        <p class="text-gray-700 leading-relaxed">${item.specificAnalysis}</p>
+                    <h3 class="text-xl font-bold text-blue-800 mb-3 flex items-center">
+                        <span class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3 text-sm">${index + 1}</span>
+                        ${item.thinker}
+                    </h3>
+                    <div class="space-y-3">
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-1">🌐 Approche Générale:</h4>
+                            <p class="text-gray-600 leading-relaxed">${item.generalApproach}</p>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-1">🔍 Analyse Spécifique:</h4>
+                            <p class="text-gray-600 leading-relaxed">${item.specificAnalysis}</p>
+                        </div>
                     </div>
                 `;
                 analysisResults.appendChild(section);
@@ -195,110 +168,28 @@
             window.scrollTo({ top: resultsCard.offsetTop, behavior: 'smooth' });
         }
 
-        /** Main function to call the Gemini API with structured request */
-        async function fetchAnalysis(subject, retries = 0) {
-            if (retries >= 3) {
-                // If it fails after 3 attempts, throw a final error
-                throw new Error("Échec de la connexion à l'API après plusieurs tentatives.");
-            }
-
-            // L'URL utilise la constante API_KEY intégrée
-            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`;
-
-
-            const thinkers = [
-                "Socrate", "Saint Augustin", "Épictète", "Friedrich Nietzsche",
-                "Pierre Bourdieu", "Charles Péguy", "Eva Illouz", "Michel Foucault"
-            ];
-            const thinkersList = thinkers.join(', ');
-
-            // 1. System Prompt
-            const systemPrompt = `Tu es un spécialiste de l'analyse sociologique et philosophique. Ton rôle est de décortiquer le sujet proposé par l'utilisateur (qui est: "${subject}") à travers le prisme des grands penseurs suivants: ${thinkersList}. Pour chaque penseur, tu dois fournir une analyse structurée, séparant : 1) l'approche générale du penseur sur le thème large associé au sujet (ex: pour 'solitude numérique', le thème large est 'isolement' ou 'relation humaine'), et 2) l'application ou l'interprétation spécifique de ses idées au sujet exact proposé par l'utilisateur. Le ton doit être académique, rigoureux, et pédagogique. Réponds UNIQUEMENT en utilisant la structure JSON fournie ci-dessous.`;
-
-            // 2. User Query
-            const userQuery = `Analyse le sujet "${subject}" en appliquant les idées des penseurs suivants: ${thinkersList}.`;
-
-            // 3. JSON Schema
-            const responseSchema = {
-                type: "ARRAY",
-                description: "Liste d'analyses, une pour chaque penseur.",
-                items: {
-                    type: "OBJECT",
-                    properties: {
-                        "thinker": {
-                            type: "STRING",
-                            description: "Nom du penseur (e.g., Socrate)."
-                        },
-                        "generalApproach": {
-                            type: "STRING",
-                            description: "Résumé de l'approche générale du penseur sur le grand thème lié au sujet (en français)."
-                        },
-                        "specificAnalysis": {
-                            type: "STRING",
-                            description: "Analyse spécifique et directe de comment les idées du penseur s'appliquent au sujet précis (en français)."
-                        }
-                    },
-                    required: ["thinker", "generalApproach", "specificAnalysis"],
-                    propertyOrdering: ["thinker", "generalApproach", "specificAnalysis"]
-                }
-            };
-
-            const payload = {
-                contents: [{ parts: [{ text: userQuery }] }],
-                // Tool use is REMOVED to solve the 400 error
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-                generationConfig: {
-                    responseMimeType: "application/json",
-                    responseSchema: responseSchema,
+        /** Fonction principale pour appeler le backend */
+        async function fetchAnalysis(subject) {
+            const response = await fetch(`${BACKEND_URL}/api/analyze`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
                 },
-            };
+                body: JSON.stringify({ subject })
+            });
 
-            try {
-                const response = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    // Log the error and status code for debugging
-                    const errorDetails = await response.text();
-                    console.error("API HTTP Error Details:", errorDetails);
-                    throw new Error(`Erreur HTTP: La requête API a échoué avec le statut ${response.status}.`);
-                }
-
-                const result = await response.json();
-                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-                if (!jsonText) {
-                    throw new Error("La réponse de l'IA était vide ou ne contenait pas de structure JSON valide.");
-                }
-
-                // Clean the text: remove optional markdown code blocks and trim
-                const cleanedJsonText = jsonText.trim().replace(/^(```json|```)/gm, '').trim(); 
-                const parsedAnalysis = JSON.parse(cleanedJsonText);
-
-                return parsedAnalysis;
-
-            } catch (error) {
-                console.error(`Tentative ${retries + 1} échouée:`, error.message);
-                const delay = Math.pow(2, retries) * 1000; // Exponential backoff
-                await new Promise(resolve => setTimeout(resolve, delay));
-                
-                // Retry the function call
-                return fetchAnalysis(subject, retries + 1); 
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Erreur lors de l\'analyse');
             }
+
+            const data = await response.json();
+            return data.analysis;
         }
 
-
-        // --- Event Listener ---
+        // Event Listener pour le bouton d'analyse
         analyzeButton.addEventListener('click', async () => {
             const subject = subjectInput.value.trim();
-
-            if (!API_KEY) {
-                showModal("Clé API Manquante", "La clé API n'est pas configurée dans le code. Veuillez insérer une clé valide pour continuer.");
-                return;
-            }
 
             if (subject.length < 5) {
                 showModal("Erreur de Saisie", "Veuillez proposer un sujet plus détaillé (au moins 5 caractères) pour une analyse pertinente.");
@@ -318,24 +209,24 @@
             } catch (error) {
                 console.error("Erreur finale de l'analyse:", error);
                 
-                // Display specific error message in the UI
-                const displayError = error.message.includes("Erreur HTTP: La requête API a échoué avec le statut 401.") ? 
-                    `Erreur critique (401 Non autorisé). La clé API intégrée n'est pas valide ou l'API Gemini n'est pas activée pour votre projet Cloud.` :
-                    (error.message.includes("Erreur HTTP") ? 
-                        `Erreur de communication avec l'IA: ${error.message}` : 
-                        "Désolé, l'analyse n'a pas pu être complétée (erreur de parsing ou de réseau)."
-                    );
+                const displayError = error.message || "Désolé, l'analyse n'a pas pu être complétée.";
                 
                 errorMessage.textContent = displayError;
                 errorMessage.classList.remove('hidden');
                 
                 analysisResults.innerHTML = `<p class="text-center text-red-500 p-8">${displayError}</p>`;
-                showModal("Erreur Critique", displayError);
+                showModal("Erreur", displayError);
             } finally {
                 setLoading(false);
             }
         });
 
+        // Permettre l'envoi avec la touche Entrée
+        subjectInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !analyzeButton.disabled) {
+                analyzeButton.click();
+            }
+        });
     </script>
 </body>
 </html>
