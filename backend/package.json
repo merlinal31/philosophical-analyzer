@@ -1,0 +1,20 @@
+{
+  "name": "philosophical-analyzer-backend",
+  "version": "1.0.0",
+  "description": "Backend sécurisé pour l'analyseur philosophique",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": ["philosophy", "gemini", "api"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "node-fetch": "^3.3.2"
+  }
+}

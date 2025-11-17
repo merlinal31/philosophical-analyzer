@@ -1,0 +1,19 @@
+# Dépendances
+node_modules/
+
+# Variables d'environnement (IMPORTANT: Ne jamais commiter ce fichier)
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
